@@ -67,6 +67,29 @@
       return cols.map(function (k) { return k < 0 ? '' : (r[k] || '').trim(); });
     }).filter(function (r) { return r[0] && r[1]; });
   }
+  // image('047.jpg', 'assets/athletes/') -> { src: adresse à afficher, lien: adresse à ouvrir }, ou null si vide.
+  // Accepte un nom de fichier (cherché dans le dossier), un lien https direct, ou un lien de partage Google Drive.
+  function image(v, dossier) {
+    v = String(v || '').trim();
+    if (!v) return null;
+    if (!/^https:\/\//i.test(v)) { var f = dossier + v.replace(/^.*[\\/]/, ''); return { src: f, lien: f }; }
+    var drive = v.match(/^https:\/\/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:[\w=]+&)*id=)([\w-]{20,})/i);
+    // Un lien de partage Drive n'est pas une image : on affiche sa vignette et on ouvre le fichier au clic.
+    return drive ? { src: 'https://drive.google.com/thumbnail?id=' + drive[1] + '&sz=w1200', lien: v } : { src: v, lien: v };
+  }
+  // Retourne { dossard: [images] } à partir du CSV de l'onglet Photos (colonnes Dossard et Photo).
+  function photosDepuisCsv(texte) {
+    var tab = parseCsv(texte), sortie = {};
+    if (tab.length < 2) return sortie;
+    var tete = tab[0].map(norm), d = tete.indexOf('dossard'), p = tete.indexOf('photo');
+    if (d < 0 || p < 0) throw new Error('Colonnes manquantes : il faut Dossard et Photo.');
+    tab.slice(1).forEach(function (r) {
+      var n = Number((r[d] || '').trim()), img = image(r[p], 'assets/photos/');
+      if (!(r[d] || '').trim() || !Number.isInteger(n) || n < 0 || !img) return;
+      (sortie[n] = sortie[n] || []).push(img);
+    });
+    return sortie;
+  }
   // Retourne des cartes à partir du CSV de l'onglet Athlètes. Une ligne sans « oui » dans Consentement est ignorée.
   function cartesDepuisCsv(texte) {
     var tab = parseCsv(texte);
@@ -77,9 +100,7 @@
     if (k.nom < 0 || k.consentement < 0) throw new Error('Colonnes manquantes : il faut au moins Nom et Consentement.');
     return tab.slice(1).map(function (r) {
       function v(i) { return i < 0 ? '' : (r[i] || '').trim(); }
-      var photo = v(k.photo);
-      // Un nom de fichier seul est cherché dans assets/athletes/ ; un lien https est pris tel quel.
-      if (photo && !/^https:\/\//i.test(photo)) photo = 'assets/athletes/' + photo.replace(/^.*[\\/]/, '');
+      var img = image(v(k.photo), 'assets/athletes/'), photo = img && img.src;
       return { nom: v(k.nom), dossard: v(k.dossard), province: v(k.province), epreuve: v(k.epreuve), meilleur: v(k.meilleur),
         photo: photo || null, consentement: ['oui', 'yes'].indexOf(norm(v(k.consentement))) >= 0 };
     }).filter(function (c) { return c.nom; });
@@ -128,6 +149,17 @@
     }).join('');
   }
 
+  // Lit un CSV publié. Sans cookies (credentials: 'omit'), et jusqu'à 3 essais d'affilée : dans un navigateur,
+  // Google redirige de temps en temps une lecture vers sa page de connexion, ce qui la fait échouer (environ 1 sur 10 mesurée).
+  function lireCsv(url, essai) {
+    essai = essai || 1;
+    return fetch(url + (url.indexOf('?') < 0 ? '?' : '&') + 't=' + Date.now(), { cache: 'no-store', credentials: 'omit' })
+      .then(function (rep) { if (!rep.ok) throw new Error('HTTP ' + rep.status); return rep.text(); })
+      .catch(function (e) {
+        if (essai >= 3) throw e;
+        return new Promise(function (ok) { setTimeout(ok, 800); }).then(function () { return lireCsv(url, essai + 1); });
+      });
+  }
   // --- Résultats ---
   var R = C.resultats || {}, lignes = [], choisie = null, etat = 'exemple', derniereMaj = null;
   function afficherResultats() {
@@ -153,8 +185,7 @@
       : etat === 'indispo' ? t('res.indispo') : t('res.exemple');
   }
   function charger() {
-    fetch(R.urlCsv + (R.urlCsv.indexOf('?') < 0 ? '?' : '&') + 't=' + Date.now(), { cache: 'no-store' })
-      .then(function (rep) { if (!rep.ok) throw new Error('HTTP ' + rep.status); return rep.text(); })
+    lireCsv(R.urlCsv)
       .then(function (texte) { lignes = lignesDepuisCsv(texte); derniereMaj = new Date(); etat = 'ok'; })
       .catch(function () { etat = derniereMaj ? 'perdu' : 'indispo'; })
       .then(function () {
@@ -165,7 +196,19 @@
   }
 
   // --- Photos ---
-  var photos = C.photos || {}, bib = $('bib'), err = $('bib-error'), grille = $('photo-grid');
+  // Photos écrites dans contenu.js : mêmes règles que celles du Google Sheet.
+  var photos = {};
+  Object.keys(C.photos || {}).forEach(function (k) {
+    var n = Number(k), liste = Array.isArray(C.photos[k]) ? C.photos[k] : [];
+    if (Number.isInteger(n)) photos[n] = liste.map(function (x) { return image(x, 'assets/photos/'); }).filter(Boolean);
+  });
+  function chargerPhotos() {
+    lireCsv(C.photosCsv)
+      .then(function (texte) { photos = photosDepuisCsv(texte); })
+      .catch(function () { setTimeout(chargerPhotos, 30000); });
+  }
+  if (C.photosCsv) { photos = {}; chargerPhotos(); }
+  var bib = $('bib'), err = $('bib-error'), grille = $('photo-grid');
   bib.addEventListener('input', function () { err.textContent = ''; });
   $('photo-form').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -174,11 +217,11 @@
     if (!/^\d{1,4}$/.test(v)) { err.textContent = t('photos.erreur'); return; }
     err.textContent = '';
     if (!Object.keys(photos).length) { err.textContent = t('photos.apres'); return; }
-    var cle = Object.keys(photos).filter(function (k) { return Number(k) === Number(v); })[0];
-    var liste = cle && Array.isArray(photos[cle]) ? photos[cle] : [];
+    var liste = photos[Number(v)] || [];
     if (!liste.length) { err.textContent = t('photos.aucune'); return; }
-    grille.innerHTML = liste.map(function (src, i) {
-      return '<a href="' + esc(src) + '" download style="background:url(\'' + esc(encodeURI(src)) + '\') center/cover">' + esc(t('photos.lien', { n: i + 1 })) + '</a>';
+    grille.innerHTML = liste.map(function (img, i) {
+      var externe = /^https:/i.test(img.lien);
+      return '<a href="' + esc(img.lien) + '"' + (externe ? ' target="_blank" rel="noopener"' : ' download') + ' style="background:url(\'' + esc(encodeURI(img.src)) + '\') center/cover">' + esc(t('photos.lien', { n: i + 1 })) + '</a>';
     }).join('');
   });
 
@@ -223,8 +266,7 @@
 
   // Cartes lues dans le Google Sheet si cartesCsv est rempli. En cas d'échec, aucune carte n'est affichée.
   function chargerCartes() {
-    fetch(C.cartesCsv, { cache: 'no-store' })
-      .then(function (rep) { if (!rep.ok) throw new Error('HTTP ' + rep.status); return rep.text(); })
+    lireCsv(C.cartesCsv)
       .then(function (texte) { listeCartes = cartesDepuisCsv(texte); afficherCartes(); })
       // Google échoue parfois une première fois : nouvel essai 30 s plus tard.
       .catch(function () { listeCartes = []; afficherCartes(); setTimeout(chargerCartes, 30000); });
@@ -233,5 +275,5 @@
   if (R.urlCsv) { traduirePage(); afficherContenu(); afficherCartes(); charger(); }
   else { lignes = R.exemple || []; toutAfficher(); }
 
-  window.SITE = { parseCsv: parseCsv, lignesDepuisCsv: lignesDepuisCsv, cartesDepuisCsv: cartesDepuisCsv, t: t };
+  window.SITE = { parseCsv: parseCsv, lignesDepuisCsv: lignesDepuisCsv, cartesDepuisCsv: cartesDepuisCsv, photosDepuisCsv: photosDepuisCsv, image: image, t: t };
 })();

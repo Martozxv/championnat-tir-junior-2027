@@ -50,9 +50,14 @@ window.CONTENU = {
     ]
   },
 
-  // Q10 à Q13 : numéro de dossard -> liste de fichiers dans assets/photos/.
-  // Vide = « Les photos seront publiées après le championnat. »
-  // shortcut: liste écrite à la main, à générer par un script si le client a plus de 200 photos.
+  // Q10 à Q13 : le client ajoute les photos lui-même dans l'onglet « Photos » du Google Sheet.
+  // Coller ici le lien CSV publié de cet onglet. Colonnes : Dossard, Photo (une ligne par photo).
+  // Photo : lien de partage Google Drive (fichier partagé à « Tous les utilisateurs disposant du lien »),
+  // lien https direct vers l'image, ou nom d'un fichier déposé dans assets/photos/.
+  // Aucune photo = « Les photos seront publiées après le championnat. »
+  photosCsv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSGMdOzxPoHOnswoEg5BPBAbXfNQe6PRRpFlmfJS5pCmQlpDt09MBBPHtpws22Gl89ANoskDnjLQi4M/pub?gid=679254536&single=true&output=csv",
+
+  // Photos écrites à la main, utilisées seulement tant que photosCsv est null.
   photos: {
     // "47": ["assets/photos/47-01.jpg", "assets/photos/47-02.jpg"]
   },

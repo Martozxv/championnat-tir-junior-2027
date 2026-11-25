@@ -30,6 +30,20 @@ assert.strictEqual(cartes[3].photo, 'assets/athletes/secret.jpg');
 assert.throws(() => S.cartesDepuisCsv('Nom,Dossard\nA,1'));
 console.log('CARTES OK');
 
+// Photos : regroupées par dossard (047 = 47), lien Drive converti en vignette, lignes incomplètes ignorées.
+const ID = '1AbCdEfGhIjKlMnOpQrStUvWxYz012345';
+const ph = S.photosDepuisCsv('Dossard,Photo\n047,47-01.jpg\n47,https://drive.google.com/file/d/' + ID + '/view?usp=sharing\n112,https://exemple.ca/a.jpg\n,orphelin.jpg\nabc,x.jpg\n9,\n');
+assert.deepStrictEqual(Object.keys(ph), ['47', '112']);
+assert.strictEqual(ph[47].length, 2);
+assert.deepStrictEqual(ph[47][0], { src: 'assets/photos/47-01.jpg', lien: 'assets/photos/47-01.jpg' });
+assert.strictEqual(ph[47][1].src, 'https://drive.google.com/thumbnail?id=' + ID + '&sz=w1200');
+assert.ok(ph[47][1].lien.includes('/file/d/' + ID));
+assert.strictEqual(ph[112][0].src, 'https://exemple.ca/a.jpg');
+assert.strictEqual(S.image('', 'x/'), null);
+assert.strictEqual(S.image('https://drive.google.com/open?id=' + ID, 'x/').src, 'https://drive.google.com/thumbnail?id=' + ID + '&sz=w1200');
+assert.throws(() => S.photosDepuisCsv('Numéro,Image\n1,a.jpg'));
+console.log('PHOTOS OK');
+
 // Langue lue dans ?lang=en, variables remplacées, clés identiques dans chaque langue.
 assert.strictEqual(S.t('photos.lien', { n: 2 }), 'Photo 2 · download');
 const fr = Object.keys(window.TEXTES.fr);
