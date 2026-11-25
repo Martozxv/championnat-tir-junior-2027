@@ -222,13 +222,14 @@
   });
 
   // Cartes lues dans le Google Sheet si cartesCsv est rempli. En cas d'échec, aucune carte n'est affichée.
-  if (C.cartesCsv) {
-    listeCartes = [];
+  function chargerCartes() {
     fetch(C.cartesCsv, { cache: 'no-store' })
       .then(function (rep) { if (!rep.ok) throw new Error('HTTP ' + rep.status); return rep.text(); })
       .then(function (texte) { listeCartes = cartesDepuisCsv(texte); afficherCartes(); })
-      .catch(function () { listeCartes = []; afficherCartes(); });
+      // Google échoue parfois une première fois : nouvel essai 30 s plus tard.
+      .catch(function () { listeCartes = []; afficherCartes(); setTimeout(chargerCartes, 30000); });
   }
+  if (C.cartesCsv) { listeCartes = []; chargerCartes(); }
   if (R.urlCsv) { traduirePage(); afficherContenu(); afficherCartes(); charger(); }
   else { lignes = R.exemple || []; toutAfficher(); }
 

@@ -61,7 +61,7 @@ window.CONTENU = {
   // Coller ici le lien CSV publié de cet onglet. Colonnes : Nom, Dossard, Province, Épreuve, Meilleur, Photo, Consentement
   // Une carte s'affiche SEULEMENT si la colonne Consentement contient « oui » (autorisation parentale reçue et conservée).
   // Photo : nom d'un fichier déposé dans assets/athletes/ (ex. 047.jpg) ou lien https direct vers l'image. Vide = case grise.
-  cartesCsv: null,
+  cartesCsv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSGMdOzxPoHOnswoEg5BPBAbXfNQe6PRRpFlmfJS5pCmQlpDt09MBBPHtpws22Gl89ANoskDnjLQi4M/pub?gid=2082639901&single=true&output=csv",
 
   // Cartes d'exemple, utilisées seulement tant que cartesCsv est null.
   cartes: [
