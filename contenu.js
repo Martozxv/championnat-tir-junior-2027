@@ -38,7 +38,7 @@ window.CONTENU = {
   resultats: {
     // Q8 : lien CSV du Google Sheet (Fichier > Partager > Publier sur le Web > feuille > CSV).
     // Colonnes attendues sur la 1re ligne : Épreuve, Athlète, Club, Province, Total
-    urlCsv: null,
+    urlCsv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSGMdOzxPoHOnswoEg5BPBAbXfNQe6PRRpFlmfJS5pCmQlpDt09MBBPHtpws22Gl89ANoskDnjLQi4M/pub?gid=0&single=true&output=csv",
     rafraichirSecondes: 60, // Q7 : à ajuster selon la fréquence des mises à jour
     // Utilisé seulement tant que urlCsv est null.
     exemple: [
