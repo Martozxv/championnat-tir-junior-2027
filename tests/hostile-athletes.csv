@@ -1,0 +1,4 @@
+Nom,Dossard,Province,Épreuve,Meilleur,Photo,Consentement
+"<b onclick=window.__xss=5>Nom</b>","1""><script>window.__xss=6</script>",QC,Carabine,600,"javascript:window.__xss=7",oui
+Deux,2,ON,Carabine,590,"https://exemple.invalid/a.jpg"" onerror=""window.__xss=8",oui
+Trois,3,AB,Carabine,580,"x.jpg' onerror='window.__xss=9",oui

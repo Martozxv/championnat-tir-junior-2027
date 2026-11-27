@@ -3,7 +3,8 @@
 (function () {
   var C = window.CONTENU || {}, T = window.TEXTES || { fr: {} };
   function $(id) { return document.getElementById(id); }
-  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  // Tout texte venu du Google Sheet ou de contenu.js passe par esc() avant d'entrer dans la page.
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 
   // --- Langue ---
   var LANGUES = Object.keys(T);
@@ -53,7 +54,8 @@
     }
     ligne.push(cell);
     if (ligne.some(function (x) { return x.trim() !== ''; })) lignes.push(ligne);
-    return lignes;
+    // Bornes : au plus 2000 lignes et 500 caractères par cellule, pour qu'une feuille anormale ne fige pas la page.
+    return lignes.slice(0, 2001).map(function (r) { return r.slice(0, 20).map(function (x) { return x.slice(0, 500); }); });
   }
   function norm(s) { return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase(); }
   // Retourne des lignes [epreuve, athlete, club, province, total] à partir du CSV du Google Sheet.
@@ -131,7 +133,7 @@
     $('partners').innerHTML = (C.partenaires || []).map(function (p) {
       var nom = tr(p.nom) || '';
       var dedans = p.logo ? '<img src="' + esc(p.logo) + '" alt="' + esc(nom) + '">' : esc(nom);
-      return p.url ? '<a href="' + esc(p.url) + '" rel="noopener">' + dedans + '</a>' : '<span>' + dedans + '</span>';
+      return p.url ? '<a href="' + esc(p.url) + '" rel="noopener noreferrer">' + dedans + '</a>' : '<span>' + dedans + '</span>';
     }).join('');
   }
   function contient(q, champs) { q = norm(q); return !q || champs.some(function (x) { return norm(x).indexOf(q) >= 0; }); }
@@ -143,8 +145,8 @@
     var cartes = toutes.filter(function (c) { return contient(q, [c.nom, c.province, c.dossard, terme(c.epreuve)]); });
     $('cards').innerHTML = !toutes.length ? '<p class="lead">' + esc(t('cartes.bientot')) + '</p>'
       : !cartes.length ? '<p class="lead">' + esc(t('cartes.aucune')) + '</p>' : cartes.map(function (c) {
-      var pic = c.photo ? ' style="background:url(\'' + esc(encodeURI(c.photo)) + '\') center/cover"' : '';
-      return '<article class="card"><div class="pic"' + pic + '>' + (c.photo ? '' : esc(t('cartes.photo'))) + '<span class="num">' + esc(c.dossard) + '</span></div>' +
+      var pic = c.photo ? '<img src="' + esc(c.photo) + '" alt="" loading="lazy">' : esc(t('cartes.photo'));
+      return '<article class="card"><div class="pic">' + pic + '<span class="num">' + esc(c.dossard) + '</span></div>' +
         '<div class="body"><h3>' + esc(c.nom) + '</h3><dl><dt>' + esc(t('cartes.province')) + '</dt><dd>' + esc(c.province) + '</dd><dt>' + esc(t('cartes.epreuve')) + '</dt><dd>' + esc(terme(c.epreuve)) + '</dd><dt>' + esc(t('cartes.meilleur')) + '</dt><dd>' + esc(c.meilleur) + '</dd></dl></div></article>';
     }).join('');
   }
@@ -153,6 +155,7 @@
   // Google redirige de temps en temps une lecture vers sa page de connexion, ce qui la fait échouer (environ 1 sur 10 mesurée).
   function lireCsv(url, essai) {
     essai = essai || 1;
+    if (!/^https:\/\/docs\.google\.com\//.test(url) && /^[a-z]+:/i.test(url)) return Promise.reject(new Error('Adresse refusée'));
     return fetch(url + (url.indexOf('?') < 0 ? '?' : '&') + 't=' + Date.now(), { cache: 'no-store', credentials: 'omit' })
       .then(function (rep) { if (!rep.ok) throw new Error('HTTP ' + rep.status); return rep.text(); })
       .catch(function (e) {
@@ -221,7 +224,7 @@
     if (!liste.length) { err.textContent = t('photos.aucune'); return; }
     grille.innerHTML = liste.map(function (img, i) {
       var externe = /^https:/i.test(img.lien);
-      return '<a href="' + esc(img.lien) + '"' + (externe ? ' target="_blank" rel="noopener"' : ' download') + ' style="background:url(\'' + esc(encodeURI(img.src)) + '\') center/cover">' + esc(t('photos.lien', { n: i + 1 })) + '</a>';
+      return '<a href="' + esc(img.lien) + '"' + (externe ? ' target="_blank" rel="noopener noreferrer"' : ' download') + '><img src="' + esc(img.src) + '" alt="" loading="lazy"><span>' + esc(t('photos.lien', { n: i + 1 })) + '</span></a>';
     }).join('');
   });
 

@@ -44,6 +44,18 @@ assert.strictEqual(S.image('https://drive.google.com/open?id=' + ID, 'x/').src, 
 assert.throws(() => S.photosDepuisCsv('Numéro,Image\n1,a.jpg'));
 console.log('PHOTOS OK');
 
+// Bornes : une feuille géante est coupée à 2000 lignes de données et 500 caractères par cellule.
+const gros = 'Épreuve,Athlète,Total\n' + Array.from({ length: 5000 }, (_, i) => 'C,' + 'A'.repeat(900) + i + ',1').join('\n');
+const g = S.lignesDepuisCsv(gros);
+assert.strictEqual(g.length, 2000);
+assert.strictEqual(g[0][1].length, 500);
+// Un lien qui n'est pas https n'est jamais gardé comme lien : il devient un nom de fichier local.
+for (const mauvais of ['javascript:alert(1)', 'data:text/html,x', 'http://exemple.ca/a.jpg', '//exemple.ca/a.jpg']) {
+  const im = S.image(mauvais, 'assets/photos/');
+  assert.ok(im.src.startsWith('assets/photos/') && im.lien.startsWith('assets/photos/'), mauvais);
+}
+console.log('SECURITE OK');
+
 // Langue lue dans ?lang=en, variables remplacées, clés identiques dans chaque langue.
 assert.strictEqual(S.t('photos.lien', { n: 2 }), 'Photo 2 · download');
 const fr = Object.keys(window.TEXTES.fr);
