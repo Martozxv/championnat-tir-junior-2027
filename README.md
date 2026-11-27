@@ -15,6 +15,7 @@ Les données affichées sont fictives tant que `demo: true` dans `contenu.js`.
 ## Sécurité
 - Le site est statique : pas de serveur, pas de connexion, pas de base de données, aucun secret dans le code.
 - Une politique de sécurité (CSP, dans `index.html`) n'autorise que les scripts et les styles du site. Ne pas ajouter de `style="…"`, de `<script>` en ligne ni de `onclick` : ils seraient bloqués.
+- Les polices sont servies par le site (`assets/fonts/`, licence OFL). Aucun appel à Google Fonts.
 - Tout texte venu du Google Sheet passe par `esc()` dans `site.js` avant d'être affiché. Les liens d'images doivent commencer par `https://`.
 - Les onglets publiés du Google Sheet sont lisibles par tous : n'y mettre que ce qui doit paraître sur le site.
 - Essai de sécurité : générer `tests/hostile.html` (voir `tests/contenu-hostile.js`) et vérifier qu'aucun code des feuilles `tests/hostile-*.csv` ne s'exécute.
