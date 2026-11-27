@@ -1,9 +1,9 @@
 // Test du lecteur CSV et des traductions de site.js, sans navigateur : node tests/csv.test.js
 const fs = require('fs'), path = require('path'), assert = require('assert');
-const el = () => ({ innerHTML: '', textContent: '', children: [], dataset: {}, value: '', addEventListener() {}, setAttribute() {}, remove() {} });
+const el = () => ({ innerHTML: '', textContent: '', children: [], dataset: {}, value: '', addEventListener() {}, append() {}, setAttribute() {}, remove() {} });
 global.window = {};
 eval(fs.readFileSync(path.join(__dirname, '..', 'i18n.js'), 'utf8'));
-global.document = { getElementById: el, querySelectorAll: () => [], documentElement: {} };
+global.document = { getElementById: el, createElement: el, querySelectorAll: () => [], documentElement: {} };
 global.location = { search: '?lang=en', href: 'http://x/' };
 global.localStorage = { getItem: () => null, setItem() {} };
 window.CONTENU = { resultats: {} };

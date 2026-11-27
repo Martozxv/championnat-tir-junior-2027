@@ -3,8 +3,22 @@
 (function () {
   var C = window.CONTENU || {}, T = window.TEXTES || { fr: {} };
   function $(id) { return document.getElementById(id); }
-  // Tout texte venu du Google Sheet ou de contenu.js passe par esc() avant d'entrer dans la page.
-  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  // Aucun HTML n'est assemblé par chaînes : la page est construite avec des nœuds, et tout texte venu du
+  // Google Sheet ou de contenu.js y entre comme du texte pur. Il ne peut donc jamais devenir du code.
+  // n('a', { href: 'x' }, ['texte', autreNoeud]) crée <a href="x">texte…</a>.
+  function n(balise, attributs, enfants) {
+    var e = document.createElement(balise);
+    Object.keys(attributs || {}).forEach(function (k) { e.setAttribute(k, attributs[k]); });
+    return remplir(e, enfants);
+  }
+  // Remplace le contenu d'un élément. Une chaîne devient un nœud de texte ; null et false sont ignorés.
+  function remplir(parent, enfants) {
+    parent.textContent = '';
+    [].concat(enfants === undefined ? [] : enfants).forEach(function (x) {
+      if (x !== null && x !== undefined && x !== false) parent.append(typeof x === 'object' ? x : String(x));
+    });
+    return parent;
+  }
 
   // --- Langue ---
   var LANGUES = Object.keys(T);
@@ -30,7 +44,7 @@
   }
   // terme('Carabine à air') : nom d'épreuve traduit avec contenu.js > termes, sinon inchangé.
   function terme(s) { var x = (C.termes || {})[s]; return x && x[langue] ? x[langue] : s; }
-  function val(v) { v = tr(v); return v === null || v === '' ? '<span class="todo">' + esc(t('aConfirmer')) + '</span>' : esc(v); }
+  function val(v) { v = tr(v); return v === null || v === '' ? n('span', { class: 'todo' }, t('aConfirmer')) : String(v); }
   function heure(d) { return langue === 'fr' ? d.getHours() + ' h ' + String(d.getMinutes()).padStart(2, '0') : d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' }); }
 
   // --- Lecteur CSV (gère les guillemets et les virgules dans les cellules) ---
@@ -124,17 +138,18 @@
   var ev = C.evenement || {};
   function afficherContenu() {
     if (C.demo === false && $('demo')) $('demo').remove();
-    $('meta').innerHTML = val(ev.lieu) + ' · ' + val(ev.dates);
-    $('infos-grid').innerHTML = (C.infos || []).map(function (b) {
+    remplir($('meta'), [val(ev.lieu), ' · ', val(ev.dates)]);
+    remplir($('infos-grid'), (C.infos || []).map(function (b) {
       var texte = tr(b.texte);
-      return '<div><h3>' + val(b.titre) + '</h3><p>' + (texte ? esc(texte) : val(null) + ' ' + esc(tr(b.aide) || '')) + '</p></div>';
-    }).join('');
-    $('contact').innerHTML = esc(t('comite')) + ' · ' + (ev.courriel ? '<a href="mailto:' + esc(ev.courriel) + '">' + esc(ev.courriel) + '</a>' : val(null));
-    $('partners').innerHTML = (C.partenaires || []).map(function (p) {
+      return n('div', {}, [n('h3', {}, val(b.titre)), n('p', {}, texte ? texte : [val(null), ' ', tr(b.aide) || ''])]);
+    }));
+    remplir($('contact'), [t('comite'), ' · ', ev.courriel ? n('a', { href: 'mailto:' + ev.courriel }, ev.courriel) : val(null)]);
+    remplir($('partners'), (C.partenaires || []).map(function (p) {
       var nom = tr(p.nom) || '';
-      var dedans = p.logo ? '<img src="' + esc(p.logo) + '" alt="' + esc(nom) + '">' : esc(nom);
-      return p.url ? '<a href="' + esc(p.url) + '" rel="noopener noreferrer">' + dedans + '</a>' : '<span>' + dedans + '</span>';
-    }).join('');
+      var dedans = p.logo ? n('img', { src: p.logo, alt: nom }) : nom;
+      // Un lien de partenaire doit commencer par https:// ; sinon le nom s'affiche sans lien.
+      return /^https:\/\//i.test(p.url || '') ? n('a', { href: p.url, rel: 'noopener noreferrer' }, dedans) : n('span', {}, dedans);
+    }));
   }
   function contient(q, champs) { q = norm(q); return !q || champs.some(function (x) { return norm(x).indexOf(q) >= 0; }); }
   var listeCartes = C.cartes || [];
@@ -143,12 +158,16 @@
     var q = $('cartes-q').value;
     $('cartes-q').hidden = toutes.length < 2;
     var cartes = toutes.filter(function (c) { return contient(q, [c.nom, c.province, c.dossard, terme(c.epreuve)]); });
-    $('cards').innerHTML = !toutes.length ? '<p class="lead">' + esc(t('cartes.bientot')) + '</p>'
-      : !cartes.length ? '<p class="lead">' + esc(t('cartes.aucune')) + '</p>' : cartes.map(function (c) {
-      var pic = c.photo ? '<img src="' + esc(c.photo) + '" alt="" loading="lazy">' : esc(t('cartes.photo'));
-      return '<article class="card"><div class="pic">' + pic + '<span class="num">' + esc(c.dossard) + '</span></div>' +
-        '<div class="body"><h3>' + esc(c.nom) + '</h3><dl><dt>' + esc(t('cartes.province')) + '</dt><dd>' + esc(c.province) + '</dd><dt>' + esc(t('cartes.epreuve')) + '</dt><dd>' + esc(terme(c.epreuve)) + '</dd><dt>' + esc(t('cartes.meilleur')) + '</dt><dd>' + esc(c.meilleur) + '</dd></dl></div></article>';
-    }).join('');
+    remplir($('cards'), !toutes.length ? n('p', { class: 'lead' }, t('cartes.bientot'))
+      : !cartes.length ? n('p', { class: 'lead' }, t('cartes.aucune')) : cartes.map(function (c) {
+      var pic = c.photo ? n('img', { src: c.photo, alt: '', loading: 'lazy' }) : t('cartes.photo');
+      return n('article', { class: 'card' }, [
+        n('div', { class: 'pic' }, [pic, n('span', { class: 'num' }, c.dossard)]),
+        n('div', { class: 'body' }, [n('h3', {}, c.nom), n('dl', {}, [
+          n('dt', {}, t('cartes.province')), n('dd', {}, c.province),
+          n('dt', {}, t('cartes.epreuve')), n('dd', {}, terme(c.epreuve)),
+          n('dt', {}, t('cartes.meilleur')), n('dd', {}, c.meilleur)])])]);
+    }));
   }
 
   // Lit un CSV publié. Sans cookies (credentials: 'omit'), et jusqu'à 3 essais d'affilée : dans un navigateur,
@@ -169,20 +188,19 @@
     var epreuves = [];
     lignes.forEach(function (r) { if (epreuves.indexOf(r[0]) < 0) epreuves.push(r[0]); });
     if (epreuves.indexOf(choisie) < 0) choisie = epreuves[0] || null;
-    $('chips').innerHTML = epreuves.map(function (e) {
-      return '<button class="chip" type="button" aria-pressed="' + (e === choisie) + '">' + esc(terme(e)) + '</button>';
-    }).join('');
-    Array.prototype.forEach.call($('chips').children, function (b, i) {
-      b.addEventListener('click', function () { choisie = epreuves[i]; afficherResultats(); });
-    });
+    remplir($('chips'), epreuves.map(function (e) {
+      var b = n('button', { class: 'chip', type: 'button', 'aria-pressed': String(e === choisie) }, terme(e));
+      b.addEventListener('click', function () { choisie = e; afficherResultats(); });
+      return b;
+    }));
     var q = $('res-q').value;
     var tous = lignes.filter(function (r) { return r[0] === choisie; })
       .sort(function (a, b) { return nombre(b[4]) - nombre(a[4]); })
       .map(function (r, i) { return r.concat(i + 1); });
     var rangs = tous.filter(function (r) { return contient(q, [r[1], r[2], r[3]]); });
-    $('rows').innerHTML = rangs.length ? rangs.map(function (r) {
-      return '<tr><td class="rank">' + r[5] + '</td><td>' + esc(r[1]) + '</td><td class="hide-sm">' + esc(r[2]) + '</td><td>' + esc(r[3]) + '</td><td class="score">' + esc(r[4]) + '</td></tr>';
-    }).join('') : '<tr><td colspan="5">' + esc(t(tous.length ? 'res.aucun' : 'res.vide')) + '</td></tr>';
+    remplir($('rows'), rangs.length ? rangs.map(function (r) {
+      return n('tr', {}, [n('td', { class: 'rank' }, r[5]), n('td', {}, r[1]), n('td', { class: 'hide-sm' }, r[2]), n('td', {}, r[3]), n('td', { class: 'score' }, r[4])]);
+    }) : n('tr', {}, n('td', { colspan: '5' }, t(tous.length ? 'res.aucun' : 'res.vide'))));
     $('updated').textContent = etat === 'ok' ? t('res.majA', { h: heure(derniereMaj) })
       : etat === 'perdu' ? t('res.perdu', { h: heure(derniereMaj) })
       : etat === 'indispo' ? t('res.indispo') : t('res.exemple');
@@ -216,16 +234,17 @@
   $('photo-form').addEventListener('submit', function (e) {
     e.preventDefault();
     var v = bib.value.trim();
-    grille.innerHTML = '';
+    remplir(grille, []);
     if (!/^\d{1,4}$/.test(v)) { err.textContent = t('photos.erreur'); return; }
     err.textContent = '';
     if (!Object.keys(photos).length) { err.textContent = t('photos.apres'); return; }
     var liste = photos[Number(v)] || [];
     if (!liste.length) { err.textContent = t('photos.aucune'); return; }
-    grille.innerHTML = liste.map(function (img, i) {
+    remplir(grille, liste.map(function (img, i) {
       var externe = /^https:/i.test(img.lien);
-      return '<a href="' + esc(img.lien) + '"' + (externe ? ' target="_blank" rel="noopener noreferrer"' : ' download') + '><img src="' + esc(img.src) + '" alt="" loading="lazy"><span>' + esc(t('photos.lien', { n: i + 1 })) + '</span></a>';
-    }).join('');
+      var attributs = externe ? { href: img.lien, target: '_blank', rel: 'noopener noreferrer' } : { href: img.lien, download: '' };
+      return n('a', attributs, [n('img', { src: img.src, alt: '', loading: 'lazy' }), n('span', {}, t('photos.lien', { n: i + 1 }))]);
+    }));
   });
 
   // --- Changement de langue : tout est réaffiché, sans recharger la page ---
@@ -259,7 +278,7 @@
   }
   compteARebours();
 
-  function toutAfficher() { traduirePage(); afficherContenu(); afficherCartes(); afficherResultats(); err.textContent = ''; grille.innerHTML = ''; }
+  function toutAfficher() { traduirePage(); afficherContenu(); afficherCartes(); afficherResultats(); err.textContent = ''; remplir(grille, []); }
   $('lang').addEventListener('click', function () {
     langue = permises.filter(function (l) { return l !== langue; })[0] || langue;
     try { localStorage.setItem('langue', langue); } catch (e) { /* stockage bloqué : la langue ne sera pas retenue */ }
